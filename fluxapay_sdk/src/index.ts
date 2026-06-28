@@ -60,6 +60,49 @@ export interface WebhookEvent {
   data: Record<string, unknown>;
 }
 
+// ── Payment Links ─────────────────────────────────────────────────────────────
+
+export interface CreatePaymentLinkParams {
+  /** Display name for the payment link. */
+  name: string;
+  /** Amount in the specified currency. */
+  amount: number;
+  /** ISO 4217 currency code (e.g. "USD", "USDC"). */
+  currency: string;
+  /** Optional arbitrary metadata attached to the link. */
+  metadata?: Record<string, string>;
+}
+
+export interface PaymentLink {
+  id: string;
+  merchant: string;
+  name: string;
+  amount: number;
+  currency: string;
+  is_active: boolean;
+  metadata?: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UseLinkParams {
+  /** Public key / address of the payer. */
+  payer: string;
+  /** ID of the payment link to use. */
+  link_id: string;
+  /** Amount being paid. */
+  amount: number;
+  /** USDC token contract address. */
+  usdc_token: string;
+}
+
+export interface VerifyBatchResult {
+  link_id: string;
+  valid: boolean;
+  is_active?: boolean;
+  error?: string;
+}
+
 export interface CreateInvoiceParams {
   /** Customer name for the invoice. */
   customer_name: string;
@@ -454,6 +497,77 @@ export class FluxaPay {
     },
   };
 
+  // ── payment links ────────────────────────────────────────────────────────────
+
+  readonly paymentLinks = {
+    /**
+     * Create a reusable payment link.
+     * Maps to `PaymentLinkManager.create_link`.
+     *
+     * Canonical route: POST /api/payment-links
+     */
+    createLink: (params: CreatePaymentLinkParams): Promise<PaymentLink> =>
+      request<PaymentLink>(this.baseUrl, this.apiKey, 'POST', '/api/payment-links', params),
+
+    /**
+     * Use a payment link to initiate a payment.
+     * Maps to `PaymentLinkManager.use_link`.
+     *
+     * Canonical route: POST /api/payment-links/:link_id/use
+     */
+    useLink: (params: UseLinkParams): Promise<Payment> =>
+      request<Payment>(
+        this.baseUrl,
+        this.apiKey,
+        'POST',
+        `/api/payment-links/${params.link_id}/use`,
+        {
+          payer: params.payer,
+          amount: params.amount,
+          usdc_token: params.usdc_token,
+        },
+      ),
+
+    /**
+     * Deactivate a payment link so it can no longer be used.
+     * Maps to `PaymentLinkManager.deactivate_link`.
+     *
+     * Canonical route: PATCH /api/payment-links/:link_id/deactivate
+     */
+    deactivateLink: (merchant: string, linkId: string): Promise<PaymentLink> =>
+      request<PaymentLink>(
+        this.baseUrl,
+        this.apiKey,
+        'PATCH',
+        `/api/payment-links/${linkId}/deactivate`,
+        { merchant },
+      ),
+
+    /**
+     * Retrieve a single payment link by ID.
+     * Maps to `PaymentLinkManager.get_link`.
+     *
+     * Canonical route: GET /api/payment-links/:link_id
+     */
+    getLink: (linkId: string): Promise<PaymentLink> =>
+      request<PaymentLink>(this.baseUrl, this.apiKey, 'GET', `/api/payment-links/${linkId}`),
+
+    /**
+     * Batch-verify multiple payment links.
+     * Maps to `PaymentLinkManager.verify_batch`.
+     *
+     * Canonical route: POST /api/payment-links/verify-batch
+     */
+    verifyBatch: (linkIds: string[]): Promise<VerifyBatchResult[]> =>
+      request<VerifyBatchResult[]>(
+        this.baseUrl,
+        this.apiKey,
+        'POST',
+        '/api/payment-links/verify-batch',
+        { link_ids: linkIds },
+      ),
+  };
+
   // ── invoices ─────────────────────────────────────────────────────────────────
 
   readonly invoices = {
@@ -511,7 +625,7 @@ export default FluxaPay;
  * ```
  */
 export async function* autoPagingIterator<T extends { id: string }>(
-  listFn: (params: { page: number; limit: number }) => Promise<{ [key: string]: T[]; total: number }>,
+  listFn: (params: { page: number; limit: number }) => Promise<Record<string, T[] | number>>,
   options: { limit?: number; maxItems?: number } = {}
 ): AsyncGenerator<T, void, unknown> {
   const { limit = 50, maxItems } = options;

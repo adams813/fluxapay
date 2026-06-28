@@ -89,6 +89,69 @@ const result = await client.payments.list({
 
 **Canonical Route:** `GET /api/payments`
 
+### Payment Links
+
+Payment links are reusable, shareable URLs that let customers pay without generating a new payment for every transaction.
+
+#### Create a Payment Link
+
+```typescript
+const link = await client.paymentLinks.createLink({
+  name: 'Monthly Subscription',
+  amount: 19.99,
+  currency: 'USD',
+  metadata: { plan: 'pro', tier: 'monthly' }, // Record<string, string>
+});
+
+console.log('Link ID:', link.id);
+console.log('Active:', link.is_active);
+```
+
+**Canonical Route:** `POST /api/payment-links`
+
+#### Use a Payment Link
+
+```typescript
+const payment = await client.paymentLinks.useLink({
+  payer: '0xCustomerWalletAddress',
+  link_id: link.id,
+  amount: 19.99,
+  usdc_token: '0xUSDCContractAddress',
+});
+
+console.log('Payment URL:', payment.checkout_url);
+```
+
+**Canonical Route:** `POST /api/payment-links/:link_id/use`
+
+#### Get a Payment Link
+
+```typescript
+const link = await client.paymentLinks.getLink(linkId);
+```
+
+**Canonical Route:** `GET /api/payment-links/:link_id`
+
+#### Deactivate a Payment Link
+
+```typescript
+await client.paymentLinks.deactivateLink(merchantId, linkId);
+```
+
+**Canonical Route:** `PATCH /api/payment-links/:link_id/deactivate`
+
+#### Verify Multiple Payment Links (Batch)
+
+```typescript
+const results = await client.paymentLinks.verifyBatch(['link_aaa', 'link_bbb']);
+
+for (const r of results) {
+  console.log(r.link_id, r.valid, r.is_active);
+}
+```
+
+**Canonical Route:** `POST /api/payment-links/verify-batch`
+
 ### Settlements
 
 #### List Settlements
@@ -239,6 +302,11 @@ All SDK methods use the canonical `/api/*` routes:
 | Payments | POST | `/api/payments` |
 | Payments | GET | `/api/payments/:id` |
 | Payments | GET | `/api/payments` |
+| Payment Links | POST | `/api/payment-links` |
+| Payment Links | POST | `/api/payment-links/:id/use` |
+| Payment Links | GET | `/api/payment-links/:id` |
+| Payment Links | PATCH | `/api/payment-links/:id/deactivate` |
+| Payment Links | POST | `/api/payment-links/verify-batch` |
 | Settlements | GET | `/api/settlements` |
 | Settlements | GET | `/api/settlements/summary` |
 | Settlements | GET | `/api/settlements/:id` |
@@ -315,7 +383,7 @@ npm publish
 The SDK is written in TypeScript and includes full type definitions.
 
 ```typescript
-import { FluxaPay, Payment, PaymentStatus, FluxaPayError } from '@fluxapay/sdk';
+import { FluxaPay, Payment, PaymentStatus, PaymentLink, FluxaPayError } from '@fluxapay/sdk';
 ```
 
 ## License

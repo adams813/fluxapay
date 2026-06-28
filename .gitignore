@@ -46,6 +46,8 @@ fluxapay_backend/prisma/*.db-journal
 .cache/
 .vercel/
 
+# Binaries — never commit platform-specific executables to the repo
+/actionlint
 
 issue.md
 pr.md
